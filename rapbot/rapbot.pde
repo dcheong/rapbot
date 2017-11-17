@@ -13,6 +13,7 @@ DatamuseAPI datamuse;
 String currentScheme;
 HashMap<Character, String> schemeMap;
 HashMap<String, JSONArray> rhymeMap;
+HashMap<String, JSONArray> relatedMap;
 Random rng;
 
 void setup() {
@@ -21,6 +22,7 @@ void setup() {
   currentScheme = "";
   schemeMap = new HashMap<Character, String>();
   rhymeMap = new HashMap<String, JSONArray>();
+  relatedMap = new HashMap<String, JSONArray>();
   rng = new Random();
   
   arial12 = createFont("arial", 12);
@@ -64,12 +66,13 @@ public void generate(int theValue) {
   for (Character c : schemeMap.keySet()) {
     String root = schemeMap.get(c);
     if (root == null || root.length() == 0) { continue; }
-    JSONArray rhymes;
     if (rhymeMap.get(root) == null) {
-      rhymes = datamuse.getRhymes(root);
+      JSONArray rhymes = datamuse.getRhymes(root);
       rhymeMap.put(root, rhymes);
-    } else {
-      rhymes = rhymeMap.get(root);
+    }
+    if (relatedMap.get(root) == null) {
+      JSONArray related = datamuse.getRelated(root);
+      relatedMap.put(root, related);
     }
   }
   StringBuilder sb = new StringBuilder();
@@ -82,7 +85,7 @@ public void generate(int theValue) {
       continue;
     }
     JSONObject word = rhymes.getJSONObject(rng.nextInt(rhymes.size()));
-    sb.append(word.getString("word")).append("\n");
+    sb.append(chooseRandWordsBackwards(word, 10)).append("\n");
   }
   rapTA.setText(sb.toString());
 }
@@ -132,4 +135,19 @@ public void updateRoots() {
     String newVal = cp5.get(Textfield.class, "word " + c).getText();
     schemeMap.put(c, newVal);
   }
+}
+
+public String chooseRandWordsBackwards(JSONObject tail, int numSyllables) {
+  String tailString = tail.getString(datamuse.WORD);
+  int currSyllables = tail.getInt(datamuse.NUM_SYLLABLES);
+  StringBuilder sb = new StringBuilder(tailString);
+  String lastWord = tailString.split(" ")[0];
+  while (currSyllables < numSyllables) {
+    JSONArray prevs = datamuse.getFuzzyPrevious(lastWord);
+    JSONObject chosenPrev = prevs.getJSONObject(rng.nextInt(prevs.size()));
+    sb.insert(0, " ").insert(0, chosenPrev.getString(datamuse.WORD));
+    currSyllables += chosenPrev.getInt(datamuse.NUM_SYLLABLES);
+    lastWord = chosenPrev.getString(datamuse.WORD);
+  }
+  return sb.toString();
 }
