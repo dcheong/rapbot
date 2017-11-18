@@ -1,8 +1,8 @@
 class DatamuseAPI {
-  public final String NUM_SYLLABLES = "numSyllables";
-  public final String TAGS = "tags";
-  public final String WORD = "word";
-  public final String SCORE = "score";
+  public static final String NUM_SYLLABLES = "numSyllables";
+  public static final String TAGS = "tags";
+  public static final String WORD = "word";
+  public static final String SCORE = "score";
   
   private final String BASE_API = "http://api.datamuse.com/words?";
   private final String AND = "&";
@@ -11,18 +11,29 @@ class DatamuseAPI {
   private final String GET_PREV = "rc=";
   // p = parts of speech (n,v,a etc.) s = syllable count
   private final String METADATA = "md=ps";
+  
+  private String call;
+  
   public DatamuseAPI() {
+    call = BASE_API;
   }
-  public JSONArray getRhymes(String root) {
-    return fetch(BASE_API + GET_RHYMES + root + AND + METADATA);
+  public DatamuseAPI and() {
+    call += AND;
+    return this;
   }
-  public JSONArray getRelated(String root) {
-    return fetch(BASE_API + GET_RELATED + root + AND + METADATA);
+  public DatamuseAPI rhymes(String root) {
+    call += GET_RHYMES + root;
+    return this;
   }
-  public JSONArray getFuzzyPrevious(String root) {
-    return fetch(BASE_API + GET_PREV + root + AND + METADATA);
+  public DatamuseAPI related(String root) {
+    call += GET_RELATED + root;
+    return this;
   }
-  public JSONArray fetch(String call) {
-    return loadJSONArray(call);
+  public DatamuseAPI previous(String root) {
+    call += GET_PREV + root;
+    return this;
+  }
+  public JSONArray fetch() {
+    return loadJSONArray(call + AND + METADATA);
   }
 }

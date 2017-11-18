@@ -8,7 +8,6 @@ ControlP5 cp5;
 Textfield rhymeSchemeTF;
 Textarea rapTA;
 Button genButton;
-DatamuseAPI datamuse;
 
 String currentScheme;
 HashMap<Character, String> schemeMap;
@@ -17,8 +16,6 @@ HashMap<String, JSONArray> relatedMap;
 Random rng;
 
 void setup() {
-  datamuse = new DatamuseAPI();
-  
   currentScheme = "";
   schemeMap = new HashMap<Character, String>();
   rhymeMap = new HashMap<String, JSONArray>();
@@ -67,11 +64,11 @@ public void generate(int theValue) {
     String root = schemeMap.get(c);
     if (root == null || root.length() == 0) { continue; }
     if (rhymeMap.get(root) == null) {
-      JSONArray rhymes = datamuse.getRhymes(root);
+      JSONArray rhymes = new DatamuseAPI().rhymes(root).fetch();
       rhymeMap.put(root, rhymes);
     }
     if (relatedMap.get(root) == null) {
-      JSONArray related = datamuse.getRelated(root);
+      JSONArray related = new DatamuseAPI().related(root).fetch();
       relatedMap.put(root, related);
     }
   }
@@ -138,16 +135,16 @@ public void updateRoots() {
 }
 
 public String chooseRandWordsBackwards(JSONObject tail, int numSyllables) {
-  String tailString = tail.getString(datamuse.WORD);
-  int currSyllables = tail.getInt(datamuse.NUM_SYLLABLES);
+  String tailString = tail.getString(DatamuseAPI.WORD);
+  int currSyllables = tail.getInt(DatamuseAPI.NUM_SYLLABLES);
   StringBuilder sb = new StringBuilder(tailString);
   String lastWord = tailString.split(" ")[0];
   while (currSyllables < numSyllables) {
-    JSONArray prevs = datamuse.getFuzzyPrevious(lastWord);
+    JSONArray prevs = new DatamuseAPI().previous(lastWord).fetch();
     JSONObject chosenPrev = prevs.getJSONObject(rng.nextInt(prevs.size()));
-    sb.insert(0, " ").insert(0, chosenPrev.getString(datamuse.WORD));
-    currSyllables += chosenPrev.getInt(datamuse.NUM_SYLLABLES);
-    lastWord = chosenPrev.getString(datamuse.WORD);
+    sb.insert(0, " ").insert(0, chosenPrev.getString(DatamuseAPI.WORD));
+    currSyllables += chosenPrev.getInt(DatamuseAPI.NUM_SYLLABLES);
+    lastWord = chosenPrev.getString(DatamuseAPI.WORD);
   }
   return sb.toString();
 }
