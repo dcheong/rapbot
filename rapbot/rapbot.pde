@@ -29,6 +29,7 @@ void setup() {
   rapVerse = "Input a rhyme scheme and words to rhyme with";
   wordArray = new ArrayList<String>();
   voice = new TTS();
+  voice.setRate(100f);
   
   arial12 = createFont("arial", 12);
   arial20 = createFont("arial", 20);
@@ -167,11 +168,11 @@ public String chooseRandWordsBackwards(JSONObject tail, int numSyllables) {
 
 void keyPressed() {
   if (keyCode == ENTER) {
-      //print(rapVerse);
-    //voice.speak(rapVerse);
-     for (String word : wordArray) {
-       voice.speak(word);
-     }
+      print(rapVerse);
+    voice.speak(rapVerse);
+     //for (String word : wordArray) {
+     //  voice.speak(word);
+     //}
        
   }
 }
