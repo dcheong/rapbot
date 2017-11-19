@@ -1,5 +1,7 @@
 import controlP5.*;
 import java.util.*;
+import guru.ttslib.*;
+import java.util.ArrayList;
 
 PFont arial12;
 PFont arial20;
@@ -8,6 +10,9 @@ ControlP5 cp5;
 Textfield rhymeSchemeTF;
 Textarea rapTA;
 Button genButton;
+TTS voice;
+String rapVerse;
+ArrayList<String> wordArray;
 
 String currentScheme;
 HashMap<Character, String> schemeMap;
@@ -21,6 +26,9 @@ void setup() {
   rhymeMap = new HashMap<String, JSONArray>();
   relatedMap = new HashMap<String, JSONArray>();
   rng = new Random();
+  rapVerse = "Input a rhyme scheme and words to rhyme with";
+  wordArray = new ArrayList<String>();
+  voice = new TTS();
   
   arial12 = createFont("arial", 12);
   arial20 = createFont("arial", 20);
@@ -82,9 +90,14 @@ public void generate(int theValue) {
       continue;
     }
     JSONObject word = rhymes.getJSONObject(rng.nextInt(rhymes.size()));
+    String wordStr = word.getString("word");
     sb.append(chooseRandWordsBackwards(word, 10)).append("\n");
+    wordArray.add(wordStr);
+
+    //wordArray.add(chooseRandWordsBackwards(word, 10));
   }
   rapTA.setText(sb.toString());
+  rapVerse = sb.toString();
 }
 
 public void updateScheme() {
@@ -143,8 +156,22 @@ public String chooseRandWordsBackwards(JSONObject tail, int numSyllables) {
     JSONArray prevs = new DatamuseAPI().previous(lastWord).fetch();
     JSONObject chosenPrev = prevs.getJSONObject(rng.nextInt(prevs.size()));
     sb.insert(0, " ").insert(0, chosenPrev.getString(DatamuseAPI.WORD));
+    wordArray.add(0, chosenPrev.getString(DatamuseAPI.WORD));
     currSyllables += chosenPrev.getInt(DatamuseAPI.NUM_SYLLABLES);
     lastWord = chosenPrev.getString(DatamuseAPI.WORD);
+    //wordArray.add(lastWord);
   }
   return sb.toString();
+}
+
+
+void keyPressed() {
+  if (keyCode == ENTER) {
+      //print(rapVerse);
+    //voice.speak(rapVerse);
+     for (String word : wordArray) {
+       voice.speak(word);
+     }
+       
+  }
 }
