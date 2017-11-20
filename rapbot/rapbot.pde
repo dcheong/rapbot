@@ -3,12 +3,12 @@ import java.util.*;
 import guru.ttslib.*;
 import java.util.ArrayList;
 
-PFont arial12;
+PFont font12;
+PFont font20;
 PFont arial20;
 
 ControlP5 cp5;
 Textfield rhymeSchemeTF;
-Textarea rapTA;
 Button genButton;
 TTS voice;
 String rapVerse;
@@ -17,21 +17,27 @@ ArrayList<String> wordArray;
 String currentScheme;
 HashMap<Character, String> schemeMap;
 HashMap<String, JSONArray> rhymeMap;
-HashMap<String, JSONArray> relatedMap;
+HashMap<Character, Integer> schemeColors;
+ArrayList<ArrayList<Word>> rap;
+ArrayList<Textlabel> textLabels;
 Random rng;
 
 void setup() {
   currentScheme = "";
   schemeMap = new HashMap<Character, String>();
   rhymeMap = new HashMap<String, JSONArray>();
-  relatedMap = new HashMap<String, JSONArray>();
+  schemeColors = new HashMap<Character, Integer>();
+  schemeColors.put(' ', color(255));
+  rap = new ArrayList<ArrayList<Word>>();
+  textLabels = new ArrayList<Textlabel>();
   rng = new Random();
   rapVerse = "Input a rhyme scheme and words to rhyme with";
   wordArray = new ArrayList<String>();
   voice = new TTS();
   voice.setRate(100f);
   
-  arial12 = createFont("arial", 12);
+  font12 = createFont("Monospaced", 12);
+  font20 = createFont("Monospaced", 20);
   arial20 = createFont("arial", 20);
   
   size(1600,900);
@@ -43,16 +49,10 @@ void setup() {
                      .setFont(arial20)
                      .setFocus(true)
                      .setColor(color(255))
+                     .setColorBackground(color(0))
                      .setColorCursor(color(255))
                      .setLabel("Rhyme Scheme (ex. ABABC)");
-   rhymeSchemeTF.getCaptionLabel().setFont(arial12).toUpperCase(false);
-   rapTA = cp5.addTextarea("generated rap")
-              .setPosition(300, 10)
-              .setSize(1290, 880)
-              .setFont(arial20)
-              .setLineHeight(24)
-              .setColor(color(255))
-              .setColorBackground(color(20,20,20));
+   rhymeSchemeTF.getCaptionLabel().setFont(font12);
      
   
   genButton = cp5.addButton("generate")
@@ -69,6 +69,10 @@ void draw() {
 }
 
 public void generate(int theValue) {
+  rap.clear();
+  for (Textlabel tl : textLabels) {
+    tl.remove();
+  }
   for (Character c : schemeMap.keySet()) {
     String root = schemeMap.get(c);
     if (root == null || root.length() == 0) { continue; }
@@ -76,13 +80,12 @@ public void generate(int theValue) {
       JSONArray rhymes = new DatamuseAPI().rhymes(root).fetch();
       rhymeMap.put(root, rhymes);
     }
-    if (relatedMap.get(root) == null) {
-      JSONArray related = new DatamuseAPI().related(root).fetch();
-      relatedMap.put(root, related);
-    }
   }
   StringBuilder sb = new StringBuilder();
+  int currentY = 10;
   for (int i = 0; i < currentScheme.length(); i++) {
+    // Each iteration is a line
+    ArrayList<Word> phrase = new ArrayList<Word>();
     Character c = currentScheme.charAt(i);
     JSONArray rhymes = rhymeMap.get(schemeMap.get(c));
     if (rhymes.size() == 0) {
@@ -90,14 +93,30 @@ public void generate(int theValue) {
       sb.append("/////").append("\n");
       continue;
     }
-    JSONObject word = rhymes.getJSONObject(rng.nextInt(rhymes.size()));
-    String wordStr = word.getString("word");
-    sb.append(chooseRandWordsBackwards(word, 10)).append("\n");
-    wordArray.add(wordStr);
-
-    //wordArray.add(chooseRandWordsBackwards(word, 10));
+    JSONObject wordObj = rhymes.getJSONObject(rng.nextInt(rhymes.size()));
+    String wordObjString = wordObj.getString(DatamuseAPI.WORD);
+    String[] splitWords = wordObjString.split(" ");
+    for (int k = 0; k < splitWords.length; k++) {
+      Word word = new Word(splitWords[k], c);
+      phrase.add(word);
+    }
+    chooseRandWordsBackwards(wordObj, 10, phrase);
+    rap.add(phrase);
+    
+    int currentX = 300;
+    for (int j = 0; j < phrase.size(); j++) {
+      Word currWord = phrase.get(j);
+      Textlabel newTL = cp5.addTextlabel(i + "-" + j)
+                           .setPosition(currentX, currentY)
+                           .setFont(font20)
+                           .setLineHeight(24)
+                           .setText(currWord.getWord())
+                           .setColor(schemeColors.get(currWord.getScheme()));
+      currentX += currWord.getWord().length() * 14;
+      textLabels.add(newTL);
+    }
+    currentY += 24;
   }
-  rapTA.setText(sb.toString());
   rapVerse = sb.toString();
 }
 
@@ -124,18 +143,21 @@ public void updateScheme() {
   }
   int counter = 0;
   for (Character c : newKeySet) {
+    if (!schemeColors.containsKey(c)) {
+      schemeColors.put(c, color(random(255),random(255),random(255)));
+    }
     Textfield newTextfield = cp5.addTextfield("word " + c)
                                 .setPosition(20, 100 + counter * 80)
                                 .setSize(200, 40)
                                 .setFont(arial20)
-                                .setColor(color(255))
+                                .setColor(schemeColors.get(c))
+                                .setColorBackground(color(0))
                                 .setColorCursor(color(255));
     if (!currentKeySet.contains(c)) {
       schemeMap.put(c, "");
     } else {
       newTextfield.setText(schemeMap.get(c));
     }
-    
     counter++;
   }
   currentScheme = newScheme;
@@ -148,19 +170,26 @@ public void updateRoots() {
   }
 }
 
-public String chooseRandWordsBackwards(JSONObject tail, int numSyllables) {
-  String tailString = tail.getString(DatamuseAPI.WORD);
+public void chooseRandWordsBackwards(JSONObject tail, int numSyllables, ArrayList<Word> phrase) {
   int currSyllables = tail.getInt(DatamuseAPI.NUM_SYLLABLES);
-  StringBuilder sb = new StringBuilder(tailString);
-  String lastWord = tailString.split(" ")[0];
+  String lastWord = phrase.get(0).getWord();
   while (currSyllables < numSyllables) {
     JSONArray prevs = new DatamuseAPI().previous(lastWord).fetch();
     JSONObject chosenPrev = prevs.getJSONObject(rng.nextInt(prevs.size()));
-    sb.insert(0, " ").insert(0, chosenPrev.getString(DatamuseAPI.WORD));
-    wordArray.add(0, chosenPrev.getString(DatamuseAPI.WORD));
+    phrase.add(0, new Word(chosenPrev, ' '));
     currSyllables += chosenPrev.getInt(DatamuseAPI.NUM_SYLLABLES);
     lastWord = chosenPrev.getString(DatamuseAPI.WORD);
-    //wordArray.add(lastWord);
+  }
+}
+
+public String rapToString() {
+  StringBuilder sb = new StringBuilder();
+  for (ArrayList<Word> phrase : rap) {
+    for (Word w : phrase) {
+      sb.append(w.getWord());
+      sb.append(" ");
+    }
+    sb.append("\n");
   }
   return sb.toString();
 }
@@ -168,8 +197,9 @@ public String chooseRandWordsBackwards(JSONObject tail, int numSyllables) {
 
 void keyPressed() {
   if (keyCode == ENTER) {
-      print(rapVerse);
-    voice.speak(rapVerse);
+    String toSpeak = rapToString();
+    print(toSpeak);
+    voice.speak(toSpeak);
      //for (String word : wordArray) {
      //  voice.speak(word);
      //}
