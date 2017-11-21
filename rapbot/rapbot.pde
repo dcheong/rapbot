@@ -5,6 +5,7 @@ import java.util.ArrayList;
 
 PFont font12;
 PFont font20;
+PFont font20B;
 PFont arial20;
 
 ControlP5 cp5;
@@ -22,6 +23,9 @@ ArrayList<ArrayList<Word>> rap;
 ArrayList<Textlabel> textLabels;
 Random rng;
 
+boolean playing = false;
+int startTime;
+
 void setup() {
   currentScheme = "";
   schemeMap = new HashMap<Character, String>();
@@ -38,6 +42,7 @@ void setup() {
   
   font12 = createFont("Monospaced", 12);
   font20 = createFont("Monospaced", 20);
+  font20B = createFont("Monospaced Bold", 20);
   arial20 = createFont("arial", 20);
   
   size(1600,900);
@@ -63,9 +68,20 @@ void setup() {
 void draw() {
   background(0);
   fill(255);
-  
   updateScheme();
   updateRoots();
+  if (playing) {
+    int timeElapsed = millis() - startTime;
+    println(timeElapsed);
+    int wordIndex = timeElapsed/200;
+    if (wordIndex < textLabels.size()) {
+      textLabels.get(wordIndex).setFont(font20B);
+      if (wordIndex > 0) {
+        textLabels.get(wordIndex - 1).setFont(font20);
+      }
+    }
+    
+  }
 }
 
 public void generate(int theValue) {
@@ -73,6 +89,7 @@ public void generate(int theValue) {
   for (Textlabel tl : textLabels) {
     tl.remove();
   }
+  textLabels.clear();
   for (Character c : schemeMap.keySet()) {
     String root = schemeMap.get(c);
     if (root == null || root.length() == 0) { continue; }
@@ -194,15 +211,39 @@ public String rapToString() {
   return sb.toString();
 }
 
+public String[] rapToStringByLine() {
+  String[] returnArr = new String[rap.size()];
+  for (int i = 0; i < rap.size(); i++) {
+    ArrayList<Word> phrase = rap.get(i);
+    StringBuilder sb = new StringBuilder();
+    for (Word w : phrase) {
+      sb.append(w.getWord());
+      sb.append(" ");
+    }
+    returnArr[i] = sb.toString();
+  }
+  return returnArr;
+}
+
 
 void keyPressed() {
   if (keyCode == ENTER) {
     String toSpeak = rapToString();
     print(toSpeak);
-    voice.speak(toSpeak);
-     //for (String word : wordArray) {
-     //  voice.speak(word);
-     //}
-       
+    Speak speak = new Speak(toSpeak, 200f);
+    Thread t = new Thread(speak);
+    t.start();
+    playing = true;
+    startTime = millis();
+    //voice.speak(toSpeak);
+    // //for (String word : wordArray) {
+    // //  voice.speak(word);
+    // //}
+    //String[] phrases = rapToStringByLine();
+    //for (String phrase : phrases) {
+    //  Speak speak = new Speak(phrase, 200f);
+    //  Thread t = new Thread(speak);
+    //  t.start();
+    //}
   }
 }
