@@ -21,6 +21,10 @@ HashMap<String, JSONArray> rhymeMap;
 HashMap<Character, Integer> schemeColors;
 ArrayList<ArrayList<Word>> rap;
 ArrayList<Textlabel> textLabels;
+ArrayList<Speak> speakList;
+int currentSpeaking = 0;
+
+
 Random rng;
 
 boolean playing = false;
@@ -37,6 +41,7 @@ void setup() {
   rng = new Random();
   rapVerse = "Input a rhyme scheme and words to rhyme with";
   wordArray = new ArrayList<String>();
+  speakList = new ArrayList<Speak>();
   voice = new TTS();
   voice.setRate(100f);
   
@@ -71,13 +76,22 @@ void draw() {
   updateScheme();
   updateRoots();
   if (playing) {
-    int timeElapsed = millis() - startTime;
-    println(timeElapsed);
-    int wordIndex = timeElapsed/200;
-    if (wordIndex < textLabels.size()) {
-      textLabels.get(wordIndex).setFont(font20B);
-      if (wordIndex > 0) {
-        textLabels.get(wordIndex - 1).setFont(font20);
+    //int timeElapsed = millis() - startTime;
+    //int wordIndex = timeElapsed/200;
+    //if (wordIndex < textLabels.size()) {
+    //  textLabels.get(wordIndex).setFont(font20B);
+    //  if (wordIndex > 0) {
+    //    textLabels.get(wordIndex - 1).setFont(font20);
+    //  }
+    //}
+    if (speakList.get(currentSpeaking).finished) {
+      if (currentSpeaking == speakList.size() - 1) {
+        playing = false;
+        speakList.clear();
+        currentSpeaking = 0;
+      } else {
+        Thread t = new Thread(speakList.get(++currentSpeaking));
+        t.start();
       }
     }
     
@@ -192,7 +206,14 @@ public void chooseRandWordsBackwards(JSONObject tail, int numSyllables, ArrayLis
   String lastWord = phrase.get(0).getWord();
   while (currSyllables < numSyllables) {
     JSONArray prevs = new DatamuseAPI().previous(lastWord).fetch();
-    JSONObject chosenPrev = prevs.getJSONObject(rng.nextInt(prevs.size()));
+    JSONArray filtered = new JSONArray();
+    int count = 0;
+    for (int i = 0; i < prevs.size(); i++) {
+      if (prevs.getJSONObject(i).getInt(DatamuseAPI.NUM_SYLLABLES) < 4) {
+        filtered.setJSONObject(count++, prevs.getJSONObject(i));
+      }
+    }
+    JSONObject chosenPrev = filtered.getJSONObject(rng.nextInt(prevs.size()));
     phrase.add(0, new Word(chosenPrev, ' '));
     currSyllables += chosenPrev.getInt(DatamuseAPI.NUM_SYLLABLES);
     lastWord = chosenPrev.getString(DatamuseAPI.WORD);
@@ -211,27 +232,48 @@ public String rapToString() {
   return sb.toString();
 }
 
-public String[] rapToStringByLine() {
-  String[] returnArr = new String[rap.size()];
+public ArrayList<String> rapToStringByLine() {
+  ArrayList<String> rapSeperated = new ArrayList<String>();
+  //ArrayList<String>returnArr = new String[rap.size()];
   for (int i = 0; i < rap.size(); i++) {
+    int syllable = 0;
     ArrayList<Word> phrase = rap.get(i);
     StringBuilder sb = new StringBuilder();
     for (Word w : phrase) {
+      syllable += w.getSyllables();
       sb.append(w.getWord());
-      sb.append(" ");
+      sb.append(" ");     
+      if (syllable >= 5) {
+          println(sb.toString());
+          rapSeperated.add(sb.toString());
+          sb = new StringBuilder();
+          syllable = 0;
+      }
     }
-    returnArr[i] = sb.toString();
+    if (sb.length() > 0) {
+      rapSeperated.add(sb.toString());
+      sb = new StringBuilder();
+      syllable = 0;
+    }
   }
-  return returnArr;
+  return rapSeperated;
 }
 
 
 void keyPressed() {
   if (keyCode == ENTER) {
-    String toSpeak = rapToString();
-    print(toSpeak);
-    Speak speak = new Speak(toSpeak, 200f);
-    Thread t = new Thread(speak);
+    //String toSpeak = rapToString();
+    ArrayList<String> toSpeak = rapToStringByLine();
+    //print(toSpeak);
+    //Speak speak = new Speak(toSpeak, 200f);
+    for (String s : toSpeak) {
+      Speak speak = new Speak(s, 200f);
+      speakList.add(speak);
+    }
+    Thread t = new Thread(speakList.get(0));
+    currentSpeaking = 0;
+    
+    //Thread t = new Thread(speak);
     t.start();
     playing = true;
     startTime = millis();
