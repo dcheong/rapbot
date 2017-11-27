@@ -2,15 +2,20 @@ import controlP5.*;
 import java.util.*;
 import guru.ttslib.*;
 import java.util.ArrayList;
+import processing.sound.*;
+import com.cage.colorharmony.*;
 
 PFont font12;
 PFont font20;
 PFont font20B;
 PFont arial20;
+PFont font36;
+PFont font36B;
 
 ControlP5 cp5;
 Textfield rhymeSchemeTF;
 Button genButton;
+Slider rateSlider;
 TTS voice;
 String rapVerse;
 ArrayList<String> wordArray;
@@ -23,7 +28,12 @@ ArrayList<ArrayList<Word>> rap;
 ArrayList<Textlabel> textLabels;
 ArrayList<Speak> speakList;
 int currentSpeaking = 0;
+ArrayList<ArrayList<Textlabel>> textLabelGroupings;
 
+ColorHarmony colorHarmony = new ColorHarmony(this);
+SoundFile beat;
+
+color[] colors = new color[8];
 
 Random rng;
 
@@ -42,12 +52,20 @@ void setup() {
   rapVerse = "Input a rhyme scheme and words to rhyme with";
   wordArray = new ArrayList<String>();
   speakList = new ArrayList<Speak>();
+  textLabelGroupings = new ArrayList<ArrayList<Textlabel>>();
   voice = new TTS();
   voice.setRate(100f);
   
+  beat = new SoundFile(this, "beat.mp3");
+  beat.amp(0.5);
+  
+  colors = colorHarmony.Triads();
+  
   font12 = createFont("Monospaced", 12);
   font20 = createFont("Monospaced", 20);
+  font36 = createFont("Monospaced", 36);
   font20B = createFont("Monospaced Bold", 20);
+  font36B = createFont("Monospaced Bold", 36);
   arial20 = createFont("arial", 20);
   
   size(1600,900);
@@ -68,6 +86,14 @@ void setup() {
   genButton = cp5.addButton("generate")
      .setPosition(240,20)
      .setSize(50,40);
+     
+  rateSlider = cp5.addSlider("speaking rate")
+    .setPosition(1400, 20)
+    .setSize(100, 20)
+    .snapToTickMarks(true)
+    .setNumberOfTickMarks(5)
+    .setRange(100,300)
+    .setValue(200f);
 }
 
 void draw() {
@@ -76,25 +102,33 @@ void draw() {
   updateScheme();
   updateRoots();
   if (playing) {
-    //int timeElapsed = millis() - startTime;
-    //int wordIndex = timeElapsed/200;
-    //if (wordIndex < textLabels.size()) {
-    //  textLabels.get(wordIndex).setFont(font20B);
-    //  if (wordIndex > 0) {
-    //    textLabels.get(wordIndex - 1).setFont(font20);
-    //  }
-    //}
     if (speakList.get(currentSpeaking).finished) {
       if (currentSpeaking == speakList.size() - 1) {
         playing = false;
         speakList.clear();
+        dehighlight(currentSpeaking);
         currentSpeaking = 0;
+        beat.stop();
       } else {
         Thread t = new Thread(speakList.get(++currentSpeaking));
         t.start();
+        highlight(currentSpeaking);
+        dehighlight(currentSpeaking - 1);
       }
     }
     
+  }
+}
+
+public void highlight(int index) {
+  for (Textlabel label : textLabelGroupings.get(index)) {
+    label.setFont(font36B);
+  }
+}
+
+public void dehighlight(int index) {
+  for (Textlabel label : textLabelGroupings.get(index)) {
+    label.setFont(font36);
   }
 }
 
@@ -139,14 +173,15 @@ public void generate(int theValue) {
       Word currWord = phrase.get(j);
       Textlabel newTL = cp5.addTextlabel(i + "-" + j)
                            .setPosition(currentX, currentY)
-                           .setFont(font20)
-                           .setLineHeight(24)
+                           .setFont(font36)
+                           .setLineHeight(36)
                            .setText(currWord.getWord())
                            .setColor(schemeColors.get(currWord.getScheme()));
-      currentX += currWord.getWord().length() * 14;
+      currentX += currWord.getWord().length() * 26;
+      currWord.label = newTL;
       textLabels.add(newTL);
     }
-    currentY += 24;
+    currentY += 36;
   }
   rapVerse = sb.toString();
 }
@@ -175,7 +210,7 @@ public void updateScheme() {
   int counter = 0;
   for (Character c : newKeySet) {
     if (!schemeColors.containsKey(c)) {
-      schemeColors.put(c, color(random(255),random(255),random(255)));
+      schemeColors.put(c, colors[(int)random(8)]);
     }
     Textfield newTextfield = cp5.addTextfield("word " + c)
                                 .setPosition(20, 100 + counter * 80)
@@ -209,7 +244,7 @@ public void chooseRandWordsBackwards(JSONObject tail, int numSyllables, ArrayLis
     JSONArray filtered = new JSONArray();
     int count = 0;
     for (int i = 0; i < prevs.size(); i++) {
-      if (prevs.getJSONObject(i).getInt(DatamuseAPI.NUM_SYLLABLES) < 4) {
+      if (prevs.getJSONObject(i).getInt(DatamuseAPI.NUM_SYLLABLES) < 5) {
         filtered.setJSONObject(count++, prevs.getJSONObject(i));
       }
     }
@@ -236,24 +271,29 @@ public ArrayList<String> rapToStringByLine() {
   ArrayList<String> rapSeperated = new ArrayList<String>();
   //ArrayList<String>returnArr = new String[rap.size()];
   for (int i = 0; i < rap.size(); i++) {
+    ArrayList<Textlabel> newGrouping = new ArrayList<Textlabel>();
     int syllable = 0;
     ArrayList<Word> phrase = rap.get(i);
     StringBuilder sb = new StringBuilder();
     for (Word w : phrase) {
+      newGrouping.add(w.label);
       syllable += w.getSyllables();
       sb.append(w.getWord());
       sb.append(" ");     
-      if (syllable >= 5) {
+      if (syllable >= 4) {
           println(sb.toString());
           rapSeperated.add(sb.toString());
           sb = new StringBuilder();
           syllable = 0;
+          textLabelGroupings.add(newGrouping);
+          newGrouping = new ArrayList<Textlabel>();
       }
     }
     if (sb.length() > 0) {
       rapSeperated.add(sb.toString());
       sb = new StringBuilder();
       syllable = 0;
+      textLabelGroupings.add(newGrouping);
     }
   }
   return rapSeperated;
@@ -267,14 +307,15 @@ void keyPressed() {
     //print(toSpeak);
     //Speak speak = new Speak(toSpeak, 200f);
     for (String s : toSpeak) {
-      Speak speak = new Speak(s, 200f);
+      Speak speak = new Speak(s, rateSlider.getValue());
       speakList.add(speak);
     }
     Thread t = new Thread(speakList.get(0));
     currentSpeaking = 0;
-    
+    highlight(0);
     //Thread t = new Thread(speak);
     t.start();
+    beat.play();
     playing = true;
     startTime = millis();
     //voice.speak(toSpeak);

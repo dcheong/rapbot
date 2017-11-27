@@ -2,6 +2,7 @@ class Word {
   private int syllables;
   private String word;
   private char scheme;
+  public Textlabel label;
   
   public Word(String word, char scheme) {
     this.word = word;
